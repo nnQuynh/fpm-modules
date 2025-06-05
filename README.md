@@ -27,7 +27,8 @@
   <img src="https://github.com/davidpfister/fpm-modules/blob/master/.dox/images/force.gif?raw=true" width="512" height="512">
 </p>
 </center>
-__fpm-modules__ is a simple plugin for modern fortran to generate module dependency graphs.
+
+**fpm-modules** is a simple plugin for modern fortran to generate module dependency graphs.
 <br><br>
 Whether you inherited a large piece of code, want to document your code base or have plans to refactor some libraries, being able to visually navigate through the files, modules and dependencies is a must. 
 The present project has been created for doing just that. It has been designed to generate a dependency graph and visualize the dependencies between modules. 
