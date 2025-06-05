@@ -1,230 +1,331 @@
-# fpm-modules
-
+# Visualizing Fortran Projects with fpm: Create Stunning Module Dependency Charts
 
 ## Introduction
 
-Not so long ago, I came across a [thread](https://fortran-lang.discourse.group/t/running-on-computer-without-fpm-and-other-questions/9097/4?u=davidpfister) describing potential use of [fpm](https://fpm.fortran-lang.org/) to create plugins and other related tools for Fortran projects. One of the comments particularly triggered my curiosity:
+Ever tried to untangle a complex Fortran project? It’s like navigating a maze without a map. Dependency charts can be a lifesaver, showing how modules and source files connect, making refactoring or debugging much easier. The Fortran Package Manager ([fpm](https://fpm.fortran-lang.org/)) is a modern tool that simplifies Fortran development, similar to how Cargo powers Rust. Beyond building projects, fpm’s API lets you create custom plugins, like one for generating interactive module dependency charts.
 
-> A dump of the model in a standard format was a missing component for more powerful plugins in general. Was just looking at how complete `fpm build --dump $FILENAME` is, as if everything is there it seems like a natural to make a “fpm-generate” plugin that at least makes a gmake(1) input file.
+Inspired by a [Fortran community discussion](https://fortran-lang.discourse.group/t/running-on-computer-without-fpm-and-other-questions/9097/4?u=davidpfister), I discovered fpm’s ability to dump a project’s structure into a JSON or TOML file. This “build model” contains all the info needed to analyze dependencies programmatically. While you could parse this file manually, fpm’s API makes it easier by letting you work directly with the model in Fortran. In this tutorial, we’ll build a plugin to create a visual dependency chart using [Mermaid](https://mermaid.js.org/), a JavaScript-based diagramming tool. Whether you’re refactoring legacy code or starting fresh, this tool will help you see the big picture.
 
-That did look very interesting and When I read this I really wanted to try to make use of it. The dump file is either json or toml (based on the extension) and can be serialized by another project to make use of it. That being said, the serialization still requires to parse the output file (using [json-fortran](https://github.com/jacobwilliams/json-fortran) or [TOML.fortran](https://toml-f.readthedocs.io/en/latest/) for instance), and make use of the model to build static analyzer, output build sequence, generate make file, etc.
+The complete code is available on [GitHub](https://github.com/davidpfister/fpm-modules).
 
-The dump (or at least the beginning of it) looks like this:
-```json
-{
-    "package-name": "fpm-modules",
-    "compiler": {
-        "id": 1,
-        "fc": "gfortran",
-        "cc": "gcc",
-        "cxx": "g++",
-        "echo": false,
-        "verbose": false
-    },
-    "archiver": {
-        "ar": "ar -rs ",
-        "use-response-file": true,
-        "echo": false,
-        "verbose": false
-    },
-    "fortran-flags": "-cpp -Wall -Wextra -fPIC -fmax-errors=1 -g -fcheck=bounds -fcheck=array-temps -fbacktrace -fcoarray=single",
-    "c-flags": "",
-    "cxx-flags": "",
-    "link-flags": "",
-    "build-prefix": "build\\gfortran",
-    "include-dirs": [
-        ".\\.\\include",
-        "build\\dependencies\\fortran-regex\\src"
-    ],
-    "link-libraries": [],
-    "external-modules": "ifcore",
-    "include-tests": false,
-    "module-naming": false,
-    "deps": {
-        "unit": 6,
-        "verbosity": 1,
-        "dep-dir": "build\\dependencies",
-        "cache": "build\\cache.toml",
-        "ndep": 9,
-        "dependencies": {
-            "fpm-modules": {
-                "name": "fpm-modules",
-                "path": ".",
-                "version": "0.1.0",
-                "proj-dir": ".\\.",
-                "done": true,
-                "update": false,
-                "cached": false
-            },
-            "fpm": {
-                "name": "fpm",
-                "git": {
-                    "descriptor": "default",
-                    "url": "https://github.com/fortran-lang/fpm"
-                },
-                "version": "0.11.0",
-                "proj-dir": "build\\dependencies\\fpm",
-                "revision": "3f0a304cd195caace551138bb0e0c77e4579b60d",
-                "done": true,
-                "update": false,
-                "cached": true
-            },
-            "json-fortran": {
-                "name": "json-fortran",
-                "git": {
-                    "descriptor": "default",
-                    "url": "https://github.com/jacobwilliams/json-fortran"
-                },
-                "version": "0",
-                "proj-dir": "build\\dependencies\\json-fortran",
-                "revision": "2dc8abefd416ec791b100a37d92d5be9f8fa46e8",
-                "done": true,
-                "update": false,
-                "cached": true
-            },
-...
-```
-The json schema is relatively easy to understand and rather straightforward. That being said, making use of it still requires quite some time and efforts. 
+## Why Module Dependency Charts?
 
-It's not until the publication of the [fpm-deps](https://github.com/ivan-pi/fpm-deps) that I realized that I could also make [fpm](https://fpm.fortran-lang.org/) a dependency and interact with the model programmatically. That repo gave me just enough material to get me started. And since the whole process took me a bit of research and trial and error, I thought I could make a tutorial out of it for anyone willing to try. 
-
-## Scope
-
-In the following, we will use `fpm` to create a dependency chart of all the modules used by a project. 
-
-The code described in this tutorial is available on [GitHub](https://github.com/davidpfister/fpm-modules). 
-If you want to do it on your own, you will need: 
-- a fortran compiler
-- fpm, the fortran package manager
-
-## The fpm project
-
-The Fortran Package Manager ([fpm](https://fpm.fortran-lang.org/)) is a community-driven, open-source tool designed to streamline the development, building, and management of Fortran projects. Modeled after Rust's Cargo, fpm simplifies the process of creating Fortran applications and libraries by providing an intuitive command-line interface for tasks such as project initialization, compilation, testing, and dependency management. Its key goal is to enhance the user experience for Fortran programmers by automating build processes, managing dependencies, and fostering a growing ecosystem of modern Fortran libraries and applications. Fpm supports features like parallel builds with OpenMP, integration with version control systems like Git, and a plugin system that allows developers to extend its functionality. Whether you're building a simple program or a complex library with multiple dependencies, fpm provides a robust framework to make Fortran development more efficient and accessible.
-
-## Getting started 
-
-Create a new project using `fpm` and the `new` command.
-```bash
-fpm new "fpm-modules"
+Modern Fortran projects rely heavily on modules, but tools like [Doxygen](https://www.doxygen.nl/) are better suited for older Fortran 77 projects, where they generate caller-callee graphs. For example, here’s a Doxygen-generated graph for the [daskr](https://github.com/davidpfister/daskr) project. With the following Doxyfile, it's relatively easy to generate this kind of graph. 
+```ini
+INPUT                  = ./src
+HAVE_DOT               = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+DISABLE_INDEX          = YES 
+GENERATE_TREEVIEW      = YES
+RECURSIVE              = YES
+COLLABORATION_GRAPH    = YES
+GRAPHICAL_HIERARCHY    = YES
+DOT_CLEANUP            = NO
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
 ```
 
-`fpm` generates a sample toml file that needs to be edited. In order, to use `fpm` itself as a dependency, it needs to be added into the dependency list. 
+<p align="center">
+  <img src="https://github.com/davidpfister/fpm-modules/blob/master/.dox/images/ddaskrh.png?raw=true" width="256" height="256" alt="Doxygen caller-callee graph">
+</p>
 
-```toml
-name = "fpm-modules"
-version = "0.1.0"
-license = "license"
-author = "davidpfister"
-maintainer = "davidpfister"
-copyright = "Copyright 2025, davidpfister"
-description = "Generate dependency graphs of Fortran modules"
+While useful for functional code, Doxygen struggles with module dependencies. Our plugin will use fpm’s API to create a chart like this :
 
-[build]
-auto-executables = true
-auto-tests = true
-auto-examples = true
-module-naming = false
+<p align="center">
+  <img src="https://via.placeholder.com/300x200.png?text=Sample+Module+Dependency+Chart" alt="Sample module dependency chart">
+</p>
 
-[install]
-library = false
-test = false
+Our goal is to loop through a project’s modules, identify their dependencies, and output an interactive chart using Mermaid. There is already [fpm-deps](https://github.com/ivan-pi/fpm-deps) to visualize project dependencies, but nothing for modules.
 
-[fortran]
-implicit-typing = false
-implicit-external = false
-source-form = "free"
+## Understanding fpm’s Role
 
-[dependencies]
-fpm = {git = "https://github.com/fortran-lang/fpm"}
-```
+[fpm](https://fpm.fortran-lang.org/) is more than a build tool—it’s a gateway to modern Fortran development. By parsing your project’s structure, fpm creates a *build model* that details every module, source file, and dependency. Our plugin will tap into this model to generate a visual dependency chart. Let’s get started!
 
-Navigate to the `src` folder and create your main module. I named mine `package.f90`. The following modules from 
-## Description of the build model
+## Setting Up the Project
 
-Since `fpm` is essentially a build system for Fortran project, it can partially parse a Fortran project and create a build tree. The idea is to make use of that build tree to generate a dependency chart. 
+First, ensure [fpm is installed](https://fpm.fortran-lang.org/en/install/index.html). Then, follow these steps:
 
-Looking at the source code it appears that one needs to instantiate a [package_config_t](https://fortran-lang.github.io/fpm/type/package_config_t.html) and access the nested components `modules_provided` and `module_used`. 
+1. **Create a New Project**:
+   Run this command to generate a project called `fpm-modules`:
+   ```bash
+   fpm new fpm-modules
+   ```
+   This creates a directory with a `fpm.toml` file, a `src` folder, and sample code.
 
-Here are reported the components that will mater be used in this tutorial.
+2. **Configure `fpm.toml`**:
+   Open `fpm.toml` and add fpm as a dependency to use its API. Here’s the updated file:
+
+   ```toml
+   name = "fpm-modules"
+   version = "0.1.0"
+   license = "MIT"
+   author = "Your Name"
+   maintainer = "Your Name"
+   copyright = "Copyright 2025, Your Name"
+   description = "Generate dependency graphs of Fortran modules"
+
+   [build]
+   auto-executables = true
+   auto-tests = true
+   auto-examples = true
+   module-naming = false
+
+   [install]
+   library = false
+   test = false
+
+   [fortran]
+   implicit-typing = false
+   implicit-external = false
+   source-form = "free"
+
+   [dependencies]
+   fpm = { git = "https://github.com/fortran-lang/fpm" }
+   ```
+
+   The `[dependencies]` section pulls in fpm’s source code, giving us access to its API.
+
+3. **Set Up the Main Module**:
+   In the `src` folder, create `package.f90` with the necessary fpm modules:
+
+   ```fortran
+   module package
+       use fpm_strings, only: string_t
+       use fpm_command_line, only: fpm_build_settings, get_command_line_settings, get_fpm_env
+       use fpm_dependency, only: dependency_tree_t, new_dependency_tree
+       use fpm_error, only: error_t, fpm_stop
+       use fpm_filesystem, only: join_path
+       use fpm_manifest, only: package_config_t, get_package_data
+       use fpm, only: build_model
+       implicit none
+       private
+
+       type, extends(package_config_t), public :: package
+       contains
+           procedure, public :: create => package_create
+       end type
+   end module
+   ```
+
+These modules provide access to fpm’s build model, file system utilities, and error handling. The key components are `package_config_t` (for project configuration) and `build_model` (for generating the dependency tree).
+
+## Exploring fpm’s Build Model
+
+fpm’s build model is a structured representation of your project’s modules, source files, and dependencies. Our plugin will use this model to identify module dependencies and create a chart.
+
+The key component is the `package_config_t` type, which contains a nested model object. Here’s a simplified view:
+
 
 ```
 -    package_config_t
                     |- model
-                           |- external_modules
+                           |- external_modules(:)
                            |- packages(:)
-                                       |-   name
+                                       |- name
                                        |- sources(:)
                                                   |- modules_provided(:)
                                                   |- module_used(:)
 ``` 
 
-## Building the model
+- **external_modules**: External modules (e.g., `ifcore` from Intel or `openmp`) linked to the project but not in the source code.
+- **packages**: Project packages, each containing:
+  - **name**: The package name.
+  - **sources**: Source files, each with:
+    - **modules_provided**: Modules defined in the file (e.g., `module math_utils`).
+    - **module_used**: Modules imported via `use` statements (e.g., `use string_utils`).
 
-Building the build model is rather easy and requires a call to the `build_model(...)` subroutine. There is a catch though: the subroutine takes a `fpm_build_settings` object as argument which is normally created from environmental variables and command lines. 
-
-As far as I can tell, there is no default build settings that can be easily used so one has to create one from scratch. Since we are not really compiling the project but stopping after the generation of the build tree, most of the values used in the settings object are of no importance. 
-
-The following default settings are used in the following:
+For example, if your project has a file `math.f90`:
+```fortran
+module math_utils
+    use string_utils
+    implicit none
+end module
 ```
-settings = fpm_build_settings(  &
-        & profile=" ",&
-        & dump='fpm_model.toml',&
-        & prune= .false., &
-        & compiler=get_fpm_env("FC", "gfortran"), &
-        & c_compiler=get_fpm_env("CC", " "), &
-        & cxx_compiler= get_fpm_env("CXX", " "), &
-        & archiver= get_fpm_env("AR", " "), &
-        & path_to_config= " ", &
-        & flag=" ", &
-        & cflag=" ", &
-        & cxxflag=" ", &
-        & ldflag=" ", &
-        & list=.false.,&
-        & show_model=.false.,&
-        & build_tests=.false.,&
-        & verbose=.false.)
-```
+The build model lists `math_utils` under `modules_provided` and `string_utils` under `module_used`.
 
-I usually find it more convenient to extend derived types from third party libraries and add the components and type-bound procedures as needed. In the present case, I created a `package` type, that extends the `package_config_t` object from the `fpm` project. 
-I extended the type with a `create` subroutine that will take case of instantiating the build model based on the previous settings.
+> **Note**: fpm organizes its model by source files, not individual modules. If a file contains multiple modules, fpm associates all `module_used` entries with the file. Our plugin will link dependencies to the first module in a file to simplify the chart.
+
+## Building the Dependency Model
+
+We’ll use the `build_model` subroutine to create the model. It requires a `fpm_build_settings` object, which we’ll configure with minimal settings since we’re only generating the model, not compiling the project.
+
+Here’s the code:
 
 ```fortran
-    type, extends(package_config_t), public :: package
-        private
-        type(fpm_model_t), public :: model
-    contains
-        procedure, pass(this), public :: create => package_create
-    end type
+subroutine package_create(this)
+    class(package), intent(inout) :: this
+    type(fpm_build_settings) :: settings
+    type(error_t), allocatable :: error
 
-    contains 
+    ! Configure build settings (most are irrelevant for model generation)
+    settings = fpm_build_settings( &
+        & profile=" ", & ! No specific build profile
+        & dump="fpm_model.toml", & ! Output model file (optional)
+        & prune=.false., & ! Don’t prune unused dependencies
+        & compiler=get_fpm_env("FC", "gfortran"), & ! Default Fortran compiler
+        & c_compiler=get_fpm_env("CC", " "), & ! No C compiler needed
+        & cxx_compiler=get_fpm_env("CXX", " "), & ! No C++ compiler needed
+        & archiver=get_fpm_env("AR", " "), & ! No archiver needed
+        & path_to_config=" ", & ! No config file needed
+        & flag=" ", & ! No Fortran flags
+        & cflag=" ", & ! No C flags
+        & cxxflag=" ", & ! No C++ flags
+        & ldflag=" ", & ! No linker flags
+        & list=.false., & ! Don’t list files
+        & show_model=.false., & ! Don’t display model
+        & build_tests=.false., & ! Exclude tests
+        & verbose=.false.) ! Minimal output
 
-    subroutine package_create(this)
-        class(package), intent(inout)   :: this
-        !private
-        type(fpm_build_settings) :: settings
-        type(error_t), allocatable :: error
-
-        settings = fpm_build_settings(  &
-        & profile=" ",&
-        & dump='fpm_model.toml',&
-        & prune= .false., &
-        & compiler=get_fpm_env("FC", "gfortran"), &
-        & c_compiler=get_fpm_env("CC", " "), &
-        & cxx_compiler= get_fpm_env("CXX", " "), &
-        & archiver= get_fpm_env("AR", " "), &
-        & path_to_config= " ", &
-        & flag=" ", &
-        & cflag=" ", &
-        & cxxflag=" ", &
-        & ldflag=" ", &
-        & list=.false.,&
-        & show_model=.false.,&
-        & build_tests=.false.,&
-        & verbose=.false.)
-
-        call build_model(this%model, settings, this%package_config_t, error)
-        if (allocated(error)) then
-            call fpm_stop(1,'*package_build* Model error: '//error%message)
-        end if
-    end subroutine
+    ! Build the model
+    call build_model(this%model, settings, this%package_config_t, error)
+    if (allocated(error)) then
+        call fpm_stop(1, '*package_create* Model error: '//error%message)
+    end if
+end subroutine
 ```
+
+## Generating the Dependency Chart
+
+We’ll generate an HTML file with Mermaid syntax to create an interactive flowchart. The chart includes subgraphs for each package and edges for module dependencies, rendered with Mermaid and Panzoom for interactivity.
+
+Here’s the code:
+
+```fortran
+subroutine generate_chart(this, filepath)
+    class(package), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    integer :: unit, i, j, k, l
+
+    ! Open HTML file for the Mermaid chart
+    open(newunit=unit, file=filepath, action='write', status='replace')
+    
+    ! Write HTML and Mermaid header
+    write(unit, '(*(A,/))') &
+        '<!DOCTYPE html>', &
+        '<html lang="en">', &
+        '<head>', &
+        '    <meta charset="utf-8">', &
+        '</head>', &
+        '<body>', &
+        '    <div class="diagram-container" id="diagram-container">', &
+        '        <pre class="mermaid">', &
+        '        flowchart LR'
+
+    ! Create subgraphs for each package
+    do i = 1, size(this%model%packages)
+        write(unit, '("      subgraph package_", A)') this%model%packages(i)%name
+        do j = 1, size(this%model%packages(i)%sources)
+            do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                write(unit, '("          ", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s
+            end do
+        end do
+        write(unit, '(A)') '      end'
+    end do
+
+    ! Create a subgraph for external modules
+    write(unit, '("      subgraph external_module")')
+    do j = 1, size(this%model%external_modules)
+        write(unit, '("          ", A)') this%model%external_modules(j)%s
+    end do
+    write(unit, '(A)') '      end'
+
+    ! Add edges for module dependencies
+    do i = 1, size(this%model%packages)
+        do j = 1, size(this%model%packages(i)%sources)
+            do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                do l = 1, size(this%model%packages(i)%sources(j)%modules_used)
+                    write(unit, '("      ", A, "-->", A)') &
+                        this%model%packages(i)%sources(j)%modules_provided(k)%s, &
+                        this%model%packages(i)%sources(j)%modules_used(l)%s
+                end do
+                exit ! Link dependencies to the first module in the file
+            end do
+        end do
+    end do
+
+    ! Close Mermaid and HTML, add scripts for rendering
+    write(unit, '(*(A,/))') &
+        '        </pre>', &
+        '    </div>', &
+        '<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>', &
+        '<script src="https://unpkg.com/@panzoom/panzoom@4.6.0/dist/panzoom.min.js"></script>', &
+        '<script>', &
+        '    mermaid.initialize({startOnLoad:false, maxEdges: 4000});', &
+        '    mermaid.run({', &
+        '        querySelector: ".mermaid",', &
+        '        postRenderCallback: (id) => {', &
+        '            const container = document.getElementById("diagram-container");', &
+        '            const svgElement = container.querySelector("svg");', &
+        '            const panzoomInstance = Panzoom(svgElement, {', &
+        '                maxScale: 5,', &
+        '                minScale: 0.5,', &
+        '                step: 0.1,', &
+        '            });', &
+        '            container.addEventListener("wheel", (event) => {', &
+        '                panzoomInstance.zoomWithWheel(event);', &
+        '            });', &
+        '        }', &
+        '    });', &
+        '</script>', &
+        '</body>', &
+        '</html>'
+    
+    close(unit)
+end subroutine
+```
+
+This code:
+1. Creates an HTML file with Mermaid syntax.
+2. Defines subgraphs for packages and external modules.
+3. Adds edges for dependencies (e.g., `module_a --> module_b`).
+4. Includes scripts for interactive rendering.
+
+To view the chart, save the output as `chart.html` and open it in a browser. Try it with a small project to see the dependencies visualized.
+
+> **Tip**: Paste the Mermaid syntax into [mermaid.live](https://mermaid.live) to preview the chart instantly.
+
+## Testing with a Sample Project
+
+To see the plugin in action, create a small Fortran project with two modules:
+
+```fortran
+! src/string_utils.f90
+module string_utils
+    implicit none
+    ! ... module code ...
+end module
+
+! src/math_utils.f90
+module math_utils
+    use string_utils
+    implicit none
+    ! ... module code ...
+end module
+```
+
+Run the plugin with:
+```bash
+fpm run
+```
+This generates `chart.html`, which you can open to see a chart showing `math_utils --> string_utils`.
+
+## Common Issues and Solutions
+
+- **Error: “Model error”**: Ensure `fpm.toml` includes the fpm dependency and your Fortran files are valid.
+- **Chart not rendering**: Check that your browser supports JavaScript and the Mermaid CDN is accessible.
+- **Multiple modules per file**: The plugin links dependencies to the first module in a file. If this is an issue, split modules into separate files.
+
+## Conclusion and Next Steps
+
+You’ve built a powerful fpm plugin to visualize Fortran module dependencies! This tool makes it easier to understand project structures, saving time during refactoring or debugging. Here are some ways to extend it:
+
+- **Try Other Formats**: use [force-graph](https://github.com/vasturiano/force-graph) for interactive 3D charts.
+- **Automate with CI/CD**: Add chart generation to your CI pipeline for up-to-date documentation.
+- **Enhance the Chart**: Add colors or labels to the Mermaid chart for clarity.
+- **Contribute**: Check the plugin on [GitHub](https://github.com/davidpfister/fpm-modules).
+
+I hope this tutorial inspires you to explore fpm’s API further. If you create a cool chart, share it with the community—we’d love to see it!
