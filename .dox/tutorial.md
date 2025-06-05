@@ -36,7 +36,7 @@ GENERATE_LATEX         = NO
 While useful for functional code, Doxygen struggles with module dependencies. Our plugin will use fpm’s API to create a chart like this :
 
 <p align="center">
-  <img src="https://via.placeholder.com/300x200.png?text=Sample+Module+Dependency+Chart" alt="Sample module dependency chart">
+  <img src="https://github.com/davidpfister/fpm-modules/blob/master/.dox/images/force.gif?raw=true" width="256" height="256" alt="Sample module dependency chart">
 </p>
 
 Our goal is to loop through a project’s modules, identify their dependencies, and output an interactive chart using Mermaid. There is already [fpm-deps](https://github.com/ivan-pi/fpm-deps) to visualize project dependencies, but nothing for modules.
@@ -93,7 +93,7 @@ First, ensure [fpm is installed](https://fpm.fortran-lang.org/en/install/index.h
    In the `src` folder, create `package.f90` with the necessary fpm modules:
 
    ```fortran
-   module package
+   module fpm_package
        use fpm_strings, only: string_t
        use fpm_command_line, only: fpm_build_settings, get_command_line_settings, get_fpm_env
        use fpm_dependency, only: dependency_tree_t, new_dependency_tree
