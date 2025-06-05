@@ -57,7 +57,7 @@ To build that library you need
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-_fpm-modules_ has few command lines that can be used: 
+**fpm-modules** has few command lines that can be used: 
 
 >- -d, --dir: The path to the directory where the fpm.toml file seats. </br>
 > ```fpm-modules -d "./"```
