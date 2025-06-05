@@ -25,6 +25,11 @@ module fpm_package
         module procedure :: package_new_from_file
     end interface
 
+    interface string_contains
+        module procedure :: string_contains_string,     &
+                            string_contains_character
+    end interface
+
     contains
 
     subroutine package_new_from_file(pack, file)
@@ -77,10 +82,12 @@ module fpm_package
         end if
     end subroutine
 
-    subroutine package_export_to_mermaid(this, file)
+    subroutine package_export_to_mermaid(this, file, exclude)
         class(package), intent(inout)       :: this
         character(*), optional, intent(in)  :: file
+        type(string_t), optional, intent(in):: exclude(:)
         !private
+        type(string_t), allocatable :: excludes_mods(:)
         type(error_t), allocatable :: error
         character(:), allocatable :: filepath
         integer :: i, j, k, l, unit
@@ -90,6 +97,8 @@ module fpm_package
         else
             filepath = this%name//'.html'
         end if
+
+        allocate(excludes_mods(0))
 
         !call this%model%dump(filepath, error, json=.true.)
         !call handle_error(error)
@@ -106,6 +115,16 @@ module fpm_package
         '       <pre class="mermaid">', &
         '       flowchart LR'
         do i = 1, size(this%model%packages)
+            if (present(exclude)) then
+                if (string_contains(exclude, this%model%packages(i)%name)) then
+                    do j = 1, size(this%model%packages(i)%sources)
+                        do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                            excludes_mods = [excludes_mods, this%model%packages(i)%sources(j)%modules_provided(k)]
+                        end do
+                    end do
+                    cycle
+                end if
+            end if
             write(unit,'("      subgraph package_", A)') this%model%packages(i)%name
             do j = 1, size(this%model%packages(i)%sources)
                 do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
@@ -114,11 +133,19 @@ module fpm_package
             end do
             write(unit,'(A)') '     end'
         end do
+        write(unit,'("      subgraph external_module")')
+        do j = 1, size(this%model%external_modules)
+            write(unit,'("      ", A)') this%model%external_modules(j)%s
+        end do
+        write(unit,'(A)') '     end'
         do i = 1, size(this%model%packages)
+            if (present(exclude)) then; if (string_contains(exclude, this%model%packages(i)%name)) cycle; end if
             do j = 1, size(this%model%packages(i)%sources)
                 do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
                     do l = 1, size(this%model%packages(i)%sources(j)%modules_used)
-                        write(unit,'("      ", A, "-->", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s
+                        if (.not. string_contains(excludes_mods, this%model%packages(i)%sources(j)%modules_used(l))) then
+                            write(unit,'("      ", A, "-->", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s
+                        end if
                     end do
                     exit !set all the use to belong to the first module in the file
                 end do
@@ -129,8 +156,8 @@ module fpm_package
         '   </div>'                     ,   &
         '<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>',   &
         '<script src="https://unpkg.com/@panzoom/panzoom@4.6.0/dist/panzoom.min.js"></script>', &
-        '<script>mermaid.initialize({startOnLoad:true, maxEdges: 4000});', &
-        'await mermaid.run({', &
+        '<script>mermaid.initialize({startOnLoad:false, maxEdges: 4000});', &
+        '    mermaid.run({', &
         '    querySelector: ".mermaid",', &
         '    postRenderCallback: (id) => {', &
         '        const container = document.getElementById("diagram-container");', &
@@ -156,16 +183,18 @@ module fpm_package
         call execute_command_line(filepath)
     end subroutine
 
-    subroutine package_export_to_forcegraph(this, file)
+    subroutine package_export_to_forcegraph(this, file, exclude)
         class(package), intent(inout)       :: this
         character(*), optional, intent(in)  :: file
+        type(string_t), optional, intent(in):: exclude(:)
         !private
         type(error_t), allocatable :: error
         character(:), allocatable :: filepath
+        type(string_t), allocatable :: excludes_mods(:)
         type(string_t), allocatable :: modules(:)
         integer :: i, j, k, l, unit, s
 
-        allocate(modules(0))
+        allocate(modules(0), excludes_mods(0))
         if (present(file)) then
             filepath = file
         else
@@ -187,6 +216,16 @@ module fpm_package
         write(unit,'(A)', advance='no') "       var datastr = '{"
         write(unit,'(A)', advance='no') '"nodes": ['
         do i = 1, size(this%model%packages)
+            if (present(exclude)) then
+                if (string_contains(exclude, this%model%packages(i)%name)) then
+                    do j = 1, size(this%model%packages(i)%sources)
+                        do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                            excludes_mods = [excludes_mods, this%model%packages(i)%sources(j)%modules_provided(k)]
+                        end do
+                    end do
+                    cycle
+                end if
+            end if
             do j = 1, size(this%model%packages(i)%sources)
                 do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
                     write(unit,'("{""id"": """, A ,""", ""group"": """, i0 ,"""},")', advance='no') &
@@ -195,14 +234,21 @@ module fpm_package
                 end do
             end do
         end do
+        do j = 1, size(this%model%external_modules)
+            write(unit,'("{""id"": """, A ,""", ""group"": """, i0 ,"""},")', advance='no') &
+                        this%model%external_modules(j)%s, 0
+            modules = [modules, this%model%external_modules(j)]
+        end do
         inquire(unit=unit, pos=s); read(unit,'(A)', advance='no', pos=s-1)
         write(unit,'(A)', advance='no') '],'
         write(unit,'(A)', advance='no') '"links": ['
         do i = 1, size(this%model%packages)
+            if (present(exclude)) then; if (string_contains(exclude, this%model%packages(i)%name)) cycle; end if
             do j = 1, size(this%model%packages(i)%sources)
                 do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
                     do l = 1, size(this%model%packages(i)%sources(j)%modules_used)
-                        if (string_contains(modules, this%model%packages(i)%sources(j)%modules_used(l))) then
+                        if (string_contains(modules, this%model%packages(i)%sources(j)%modules_used(l)) .and. &
+                            .not. string_contains(excludes_mods, this%model%packages(i)%sources(j)%modules_used(l))) then
                             write(unit,'("{""source"": """, A ,""", ""target"": """, A ,""", ""value"":", i0,"},")', advance='no') &
                                 this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s, merge(5, 1, i == 1)
                         end if
@@ -240,7 +286,7 @@ module fpm_package
         end if
     end subroutine
 
-    logical function string_contains(lhs, rhs) result(res)
+    logical function string_contains_string(lhs, rhs) result(res)
         type(string_t), intent(in) :: lhs(:)
         type(string_t), intent(in) :: rhs
         !private
@@ -249,6 +295,21 @@ module fpm_package
         res = .false.
         do i = 1, size(lhs)
             if (lhs(i)%s == rhs%s) then
+                res = .true.
+                exit
+            end if
+        end do
+    end function
+
+    logical function string_contains_character(lhs, rhs) result(res)
+        type(string_t), intent(in)  :: lhs(:)
+        character(*), intent(in)    :: rhs
+        !private
+        integer :: i
+
+        res = .false.
+        do i = 1, size(lhs)
+            if (lhs(i)%s == rhs) then
                 res = .true.
                 exit
             end if

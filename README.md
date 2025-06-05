@@ -1,217 +1,170 @@
-# fpm-modules
+<a id="readme-top"></a>
 
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
 
-## Introduction
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <h3 align="center">fpm-modules</h3>
 
-Not so long ago, I came across a [thread](https://fortran-lang.discourse.group/t/running-on-computer-without-fpm-and-other-questions/9097/4?u=davidpfister) describing potential use of [fpm](https://fpm.fortran-lang.org/) to create plugins and other related tools for Fortran projects. One of the comments particularly triggered my curiosity:
+  <p align="center">
+    A fpm plugin to generate module dependency graph
+    <br />
+    <a href="https://github.com/davidpfister/fpm-modules"><strong>Explore the project »</strong></a>
+    <br />
+  </p>
+</div>
 
-> A dump of the model in a standard format was a missing component for more powerful plugins in general. Was just looking at how complete `fpm build --dump $FILENAME` is, as if everything is there it seems like a natural to make a “fpm-generate” plugin that at least makes a gmake(1) input file.
+# Introduction
+<!-- ABOUT THE PROJECT -->
+## About the Project
+<center>
+<p align="center">
+  <img src="https://github.com/davidpfister/fpm-modules/blob/master/.dox/images/force.gif?raw=true" width="512" height="512">
+</p>
+</center>
+__fpm-modules__ is a simple plugin for modern fortran to generate module dependency graphs.
+<br><br>
+Whether you inherited a large piece of code, want to document your code base or have plans to refactor some libraries, being able to visually navigate through the files, modules and dependencies is a must. 
+The present project has been created for doing just that. It has been designed to generate a dependency graph and visualize the dependencies between modules. 
 
-That did look very interesting and When I read this I really wanted to try to make use of it. The dump file is either json or toml (based on the extension) and can be serialized by another project to make use of it. That being said, the serialization still requires to parse the output file (using [json-fortran](https://github.com/jacobwilliams/json-fortran) or [TOML.fortran](https://toml-f.readthedocs.io/en/latest/) for instance), and make use of the model to build static analyzer, output build sequence, generate make file, etc.
+* [![fpm][fpm]][fpm-url]
+* [![ifort][ifort]][ifort-url]
+* [![gfortran][gfortran]][gfortran-url]
 
-The dump (or at least the beginning of it) looks like this:
-```json
-{
-    "package-name": "fpm-modules",
-    "compiler": {
-        "id": 1,
-        "fc": "gfortran",
-        "cc": "gcc",
-        "cxx": "g++",
-        "echo": false,
-        "verbose": false
-    },
-    "archiver": {
-        "ar": "ar -rs ",
-        "use-response-file": true,
-        "echo": false,
-        "verbose": false
-    },
-    "fortran-flags": "-cpp -Wall -Wextra -fPIC -fmax-errors=1 -g -fcheck=bounds -fcheck=array-temps -fbacktrace -fcoarray=single",
-    "c-flags": "",
-    "cxx-flags": "",
-    "link-flags": "",
-    "build-prefix": "build\\gfortran",
-    "include-dirs": [
-        ".\\.\\include",
-        "build\\dependencies\\fortran-regex\\src"
-    ],
-    "link-libraries": [],
-    "external-modules": "ifcore",
-    "include-tests": false,
-    "module-naming": false,
-    "deps": {
-        "unit": 6,
-        "verbosity": 1,
-        "dep-dir": "build\\dependencies",
-        "cache": "build\\cache.toml",
-        "ndep": 9,
-        "dependencies": {
-            "fpm-modules": {
-                "name": "fpm-modules",
-                "path": ".",
-                "version": "0.1.0",
-                "proj-dir": ".\\.",
-                "done": true,
-                "update": false,
-                "cached": false
-            },
-            "fpm": {
-                "name": "fpm",
-                "git": {
-                    "descriptor": "default",
-                    "url": "https://github.com/fortran-lang/fpm"
-                },
-                "version": "0.11.0",
-                "proj-dir": "build\\dependencies\\fpm",
-                "revision": "3f0a304cd195caace551138bb0e0c77e4579b60d",
-                "done": true,
-                "update": false,
-                "cached": true
-            },
-            "json-fortran": {
-                "name": "json-fortran",
-                "git": {
-                    "descriptor": "default",
-                    "url": "https://github.com/jacobwilliams/json-fortran"
-                },
-                "version": "0",
-                "proj-dir": "build\\dependencies\\json-fortran",
-                "revision": "2dc8abefd416ec791b100a37d92d5be9f8fa46e8",
-                "done": true,
-                "update": false,
-                "cached": true
-            },
-...
-```
-The json schema is relatively easy to understand and rather straightforward. That being said, making use of it still requires quite some time and efforts. 
+<!-- GETTING STARTED -->
+## Getting Started
 
-It's not until the publication of the [fpm-deps](https://github.com/ivan-pi/fpm-deps) that I realized that I could also make [fpm](https://fpm.fortran-lang.org/) a dependency and interact with the model programmatically. That repo gave me just enough material to get me started. And since the whole process took me a bit of research and trial and error, I thought I could make a tutorial out of it for anyone willing to try. 
+### Requirements
 
-## Scope
+To build that library you need
 
-In the following, we will use `fpm` to create a dependency chart of all the modules used by a project. 
+- a Fortran compiler. The following compilers are tested on the default branch of _fpm-modules_:
 
-The code described in this tutorial is available on [GitHub](https://github.com/davidpfister/fpm-modules). 
-If you want to do it on your own, you will need: 
-- a fortran compiler
-- fpm, the fortran package manager
+<center>
 
-## The fpm project
+| Name |	Version	| Platform	| Architecture |
+|:--:|:--:|:--:|:--:|
+| GCC Fortran (MinGW) | 14 | Windows 10 | x86_64 |
+| Intel oneAPI classic	| 2021.5	| Windows 10 |	x86_64 |
 
-The Fortran Package Manager ([fpm](https://fpm.fortran-lang.org/)) is a community-driven, open-source tool designed to streamline the development, building, and management of Fortran projects. Modeled after Rust's Cargo, fpm simplifies the process of creating Fortran applications and libraries by providing an intuitive command-line interface for tasks such as project initialization, compilation, testing, and dependency management. Its key goal is to enhance the user experience for Fortran programmers by automating build processes, managing dependencies, and fostering a growing ecosystem of modern Fortran libraries and applications. Fpm supports features like parallel builds with OpenMP, integration with version control systems like Git, and a plugin system that allows developers to extend its functionality. Whether you're building a simple program or a complex library with multiple dependencies, fpm provides a robust framework to make Fortran development more efficient and accessible.
+</center>
 
-## Getting started 
+<!-- USAGE EXAMPLES -->
+## Usage
 
-Create a new project using `fpm` and the `new` command.
+_fpm-modules_ has few command lines that can be used: 
+
+>- -d, --dir: The path to the directory where the fpm.toml file seats. </br>
+> ```fpm-modules -d "./"```
+>- -c, --chart: The charting library. Possible options are "mermaid" and "force" (default).</br>
+> ```fpm-modules -c "mermaid"``` 
+>- -x, -exclude: The list of excluded packages by name.  Names are comma-separated, no spaces, no quotes.</br>
+> ```fpm-modules -x fpm,daglib```
+
+### Installation
+
+#### Get the code
 ```bash
-fpm new "fpm-modules"
+git clone https://github.com/davidpfister/fpm-modules
+cd fpm-modules
 ```
 
-`fpm` generates a sample toml file that needs to be edited. In order, to use `fpm` itself as a dependency, it needs to be added into the dependency list. 
+#### Build with fpm
 
-```toml
-name = "fpm-modules"
-version = "0.1.0"
-license = "license"
-author = "davidpfister"
-maintainer = "davidpfister"
-copyright = "Copyright 2025, davidpfister"
-description = "Generate dependency graphs of Fortran modules"
-
-[build]
-auto-executables = true
-auto-tests = true
-auto-examples = true
-module-naming = false
-
-[install]
-library = false
-test = false
-
-[fortran]
-implicit-typing = false
-implicit-external = false
-source-form = "free"
-
-[dependencies]
-fpm = {git = "https://github.com/fortran-lang/fpm"}
+The repo can be build using _fpm_
+```bash
+fpm build
 ```
+<!-- CONTRIBUTING -->
+### Contributing
 
-## Description of the build model
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**. So, thank you for considering contributing to _fpm-modules_.
+Please review and follow these guidelines to make the contribution process simple and effective for all involved. In return, the developers will help address your problem, evaluate changes, and guide you through your pull requests.
 
-Since `fpm` is essentially a build system for Fortran project, it can partially parse a Fortran project and create a build tree. The idea is to make use of that build tree to generate a dependency chart. 
+By contributing to _fpm-modules_, you certify that you own or are allowed to share the content of your contribution under the same license.
 
-Looking at the source code it appears that one needs to instantiate a [package_config_t](https://fortran-lang.github.io/fpm/type/package_config_t.html) and access the nested components `modules_provided` and `module_used`. 
+### Style
 
-Here are reported the components that will mater be used in this tutorial.
+Please follow the style used in this repository for any Fortran code that you contribute. This allows focusing on substance rather than style.
 
-```
--    package_config_t
-                    |- model
-                           |- packages(:)
-                                       |-   name
-                                       |- sources(:)
-                                                  |- modules_provided(:)
-                                                  |- module_used(:)
-``` 
+### Reporting a bug
 
-## Building the model
+A bug is a *demonstrable problem* caused by the code in this repository.
+Good bug reports are extremely valuable to us—thank you!
 
-Building the build model is rather easy and requires a call to the `build_model(...)` subroutine. There is a catch though: the subroutine takes a `fpm_build_settings` object as argument which is normally created from environmental variables and command lines. 
+Before opening a bug report:
 
-As far as I can tell, there is no default build settings that can be easily used so one has to create one from scratch. Since we are not really compiling the project but stopping after the generation of the build tree, most of the values used in the settings object are of no importance. 
+1. Check if the issue has already been reported
+   ([issues](https://github.com/davidpfister/fpm-modules/issues)).
+2. Check if it is still an issue or it has been fixed?
+   Try to reproduce it with the latest version from the default branch.
+3. Isolate the problem and create a minimal test case.
 
-The following settings are used in the following:
-```
-settings = fpm_build_settings(  &
-        & profile=" ",&
-        & dump='fpm_model.toml',&
-        & prune= .false., &
-        & compiler=get_fpm_env("FC", "gfortran"), &
-        & c_compiler=get_fpm_env("CC", " "), &
-        & cxx_compiler= get_fpm_env("CXX", " "), &
-        & archiver= get_fpm_env("AR", " "), &
-        & path_to_config= " ", &
-        & flag=" ", &
-        & cflag=" ", &
-        & cxxflag=" ", &
-        & ldflag=" ", &
-        & list=.false.,&
-        & show_model=.false.,&
-        & build_tests=.false.,&
-        & verbose=.false.)
-```
+A good bug report should include all information needed to reproduce the bug.
+Please be as detailed as possible:
+
+1. Which version of _fpm-modules_ are you using? Please be specific.
+2. What are the steps to reproduce the issue?
+3. What is the expected outcome?
+4. What happens instead?
+
+This information will help the developers diagnose the issue quickly and with
+minimal back-and-forth.
+
+### Pull request
+
+If you have a suggestion that would make this project better, please create a pull request. You can also simply open an issue with the tag "enhancement".
+Don't forget to give the project a star! Thanks again!
+1. Open a [new issue](https://github.com/davidpfister/fpm-modules/issues/new) to
+   describe a bug or propose a new feature.
+   Refer to the earlier sections on how to write a good bug report or feature    request.
+2. Discuss with the developers and reach consensus about what should be done about the bug or feature request.
+   **When actively working on code towards a PR, please assign yourself to the
+   issue on GitHub.**
+   This is good collaborative practice to avoid duplicated effort and also inform others what you are currently working on.
+3. Create your Feature Branch (```git checkout -b feature/AmazingFeature```)
+4. Commit your Changes (```git commit -m 'Add some AmazingFeature'```)
+5. Push to the Branch (```git push origin feature/AmazingFeature```)
+6. Open a Pull Request with your contribution.
+   The body of the PR should at least include a bullet-point summary of the
+   changes, and a detailed description is encouraged.
+   If the PR completely addresses the issue you opened in step 1, include in
+   the PR description the following line: ```Fixes #<issue-number>```. If your PR implements a feature that adds or changes the behavior of _fpm-modules_,
+   your PR must also include appropriate changes to the documentation and associated units tests.
+
+In brief, 
+* A PR should implement *only one* feature or bug fix.
+* Do not commit changes to files that are irrelevant to your feature or bug fix.
+* Smaller PRs are better than large PRs, and will lead to a shorter review and
+  merge cycle
+* Add tests for your feature or bug fix to be sure that it stays functional and useful
+* Be open to constructive criticism and requests for improving your code.
 
 
-```fortran
-    subroutine package_create(this)
-        class(package), intent(inout)   :: this
-        !private
-        type(fpm_build_settings) :: settings
-        type(error_t), allocatable :: error
+<!-- LICENSE -->
+## License
 
-        settings = fpm_build_settings(  &
-        & profile=" ",&
-        & dump='fpm_model.toml',&
-        & prune= .false., &
-        & compiler=get_fpm_env("FC", "gfortran"), &
-        & c_compiler=get_fpm_env("CC", " "), &
-        & cxx_compiler= get_fpm_env("CXX", " "), &
-        & archiver= get_fpm_env("AR", " "), &
-        & path_to_config= " ", &
-        & flag=" ", &
-        & cflag=" ", &
-        & cxxflag=" ", &
-        & ldflag=" ", &
-        & list=.false.,&
-        & show_model=.false.,&
-        & build_tests=.false.,&
-        & verbose=.false.)
+Distributed under the MIT License.
 
-        call build_model(this%model, settings, this%package_config_t, error)
-        if (allocated(error)) then
-            call fpm_stop(1,'*package_build* Model error: '//error%message)
-        end if
-    end subroutine
-```
+<!-- MARKDOWN LINKS & IMAGES -->
+[contributors-shield]: https://img.shields.io/github/contributors/davidpfister/fpm-modules.svg?style=for-the-badge
+[contributors-url]: https://github.com/davidpfister/fpm-modules/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/davidpfister/fpm-modules.svg?style=for-the-badge
+[forks-url]: https://github.com/davidpfister/fpm-modules/network/members
+[stars-shield]: https://img.shields.io/github/stars/davidpfister/fpm-modules.svg?style=for-the-badge
+[stars-url]: https://github.com/davidpfister/fpm-modules/stargazers
+[issues-shield]: https://img.shields.io/github/issues/davidpfister/fpm-modules.svg?style=for-the-badge
+[issues-url]: https://github.com/davidpfister/fpm-modules/issues
+[license-shield]: https://img.shields.io/github/license/davidpfister/fpm-modules.svg?style=for-the-badge
+[license-url]: https://github.com/davidpfister/fpm-modules/master/LICENSE
+[gfortran]: https://img.shields.io/badge/gfortran-000000?style=for-the-badge&logo=gnu&logoColor=white
+[gfortran-url]: https://gcc.gnu.org/wiki/GFortran
+[ifort]: https://img.shields.io/badge/ifort-000000?style=for-the-badge&logo=Intel&logoColor=61DAFB
+[ifort-url]: https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html
+[fpm]: https://img.shields.io/badge/fpm-000000?style=for-the-badge&logo=Fortran&logoColor=734F96
+[fpm-url]: https://fpm.fortran-lang.org/
