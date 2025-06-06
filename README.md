@@ -81,6 +81,19 @@ The repo can be build using _fpm_
 ```bash
 fpm build
 ```
+
+#### Installation as fpm plugin
+
+Since it is built with fpm it can easily be installed on your system with
+```bash
+git clone https://github.com/davidpfister/fpm-modules
+cd fpm-modules
+fpm install --profile release
+```
+This will install the fpm-modules binary to ~/.local/bin (or %APPDATA%\local\bin on Windows).
+
+For more information about fpm plugins, visit the [fpm website](https://fpm.fortran-lang.org/tutorial/plugins.html).
+
 <!-- CONTRIBUTING -->
 ### Contributing
 
