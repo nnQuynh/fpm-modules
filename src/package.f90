@@ -179,8 +179,6 @@ module fpm_package
         '</html>'
 
         close(unit)
-
-        call execute_command_line(filepath)
     end subroutine
 
     subroutine package_export_to_forcegraph(this, file, exclude)
@@ -274,8 +272,6 @@ module fpm_package
         '   </body>'                       ,   &
         '</html>'
         close(unit)
-
-        call execute_command_line(filepath)
     end subroutine
 
     subroutine handle_error(error_)
