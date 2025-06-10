@@ -12,6 +12,10 @@ module fpm_package
 
     public :: new
 
+    type self_mods
+        type(string_t), allocatable :: modules(:)
+    end type
+
     type, extends(package_config_t), public :: package
         private
         type(fpm_model_t), public :: model
@@ -19,6 +23,8 @@ module fpm_package
         procedure, pass(this), public :: create => package_create
         procedure, pass(this), public :: export_to_mermaid => package_export_to_mermaid
         procedure, pass(this), public :: export_to_forcegraph => package_export_to_forcegraph
+        procedure, pass(this), public :: export_to_dot => package_export_to_dot
+        procedure, pass(this), public :: export_to_circle => package_export_to_circle
     end type
 
     interface new
@@ -111,9 +117,9 @@ module fpm_package
         '   <meta charset="utf-8">'     ,   &
         '</head>'                       ,   &
         '<body>'                        ,   &
-        '   <div class="diagram-container" id="diagram-container">'      ,   &
-        '       <pre class="mermaid">', &
-        '       flowchart LR'
+        '    <div class="diagram-container" id="diagram-container">'      ,   &
+        '        <pre class="mermaid">', &
+        'flowchart LR'
         do i = 1, size(this%model%packages)
             if (present(exclude)) then
                 if (string_contains(exclude, this%model%packages(i)%name)) then
@@ -125,26 +131,26 @@ module fpm_package
                     cycle
                 end if
             end if
-            write(unit,'("      subgraph package_", A)') this%model%packages(i)%name
+            write(unit,'("    subgraph package_", A)') this%model%packages(i)%name
             do j = 1, size(this%model%packages(i)%sources)
                 do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
-                    write(unit,'("      ", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s
+                    write(unit,'("        ", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s
                 end do
             end do
-            write(unit,'(A)') '     end'
+            write(unit,'(A)') '    end'
         end do
-        write(unit,'("      subgraph external_module")')
+        write(unit,'("    subgraph external_module")')
         do j = 1, size(this%model%external_modules)
-            write(unit,'("      ", A)') this%model%external_modules(j)%s
+            if (len_trim(this%model%external_modules(j)%s) > 0) write(unit,'("        ", A)') this%model%external_modules(j)%s
         end do
-        write(unit,'(A)') '     end'
+        write(unit,'(A)') '    end'
         do i = 1, size(this%model%packages)
             if (present(exclude)) then; if (string_contains(exclude, this%model%packages(i)%name)) cycle; end if
             do j = 1, size(this%model%packages(i)%sources)
                 do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
                     do l = 1, size(this%model%packages(i)%sources(j)%modules_used)
                         if (.not. string_contains(excludes_mods, this%model%packages(i)%sources(j)%modules_used(l))) then
-                            write(unit,'("      ", A, "-->", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s
+                            write(unit,'("    ", A, "-->", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s
                         end if
                     end do
                     exit !set all the use to belong to the first module in the file
@@ -190,7 +196,7 @@ module fpm_package
         character(:), allocatable :: filepath
         type(string_t), allocatable :: excludes_mods(:)
         type(string_t), allocatable :: modules(:)
-        integer :: i, j, k, l, unit, s
+        integer :: i, j, k, l, s, unit
 
         allocate(modules(0), excludes_mods(0))
         if (present(file)) then
@@ -274,13 +280,228 @@ module fpm_package
         close(unit)
     end subroutine
 
-    subroutine handle_error(error_)
-        type(error_t), optional, intent(in) :: error_
-        if (present(error_)) then
-            write (*, '("[Error]", 1x, a)') error_%message
+    subroutine package_export_to_dot(this, engine, file, exclude)
+        class(package), intent(inout)       :: this
+        character(*), intent(in)            :: engine
+        character(*), optional, intent(in)  :: file
+        type(string_t), optional, intent(in):: exclude(:)
+        !private
+        type(string_t), allocatable :: excludes_mods(:)
+        type(self_mods), allocatable :: smods(:)
+        type(error_t), allocatable :: error
+        character(:), allocatable :: filepath
+        character(1) :: svg
+        integer :: i, j, k, l, n, unit, sunit
+        integer :: iostat
+        character(100) :: iomsg
+        logical :: exists, is_added
+
+        if (present(file)) then
+            filepath = file
+        else
+            filepath = this%name//'.html'
+        end if
+
+        allocate(excludes_mods(0))
+        allocate(smods(size(this%model%packages)))
+        
+
+        open(newunit=unit, file=this%name//'.dot', action='write', status='replace')
+        write(unit, '(A)') 'digraph modules {'
+        do i = 1, size(this%model%packages)
+            allocate(smods(i)%modules(0))
+            if (present(exclude)) then
+                if (string_contains(exclude, this%model%packages(i)%name)) then
+                    do j = 1, size(this%model%packages(i)%sources)
+                        do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                            excludes_mods = [excludes_mods, this%model%packages(i)%sources(j)%modules_provided(k)]
+                        end do
+                    end do
+                    cycle
+                end if
+            end if
+            do j = 1, size(this%model%packages(i)%sources)
+                do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                    smods(i)%modules = [smods(i)%modules, this%model%packages(i)%sources(j)%modules_provided(k)]
+                end do
+            end do
+
+            write(unit,'("    subgraph cluster_", i0, " {")') i
+            write(unit,'("        ", A)') 'style=filled'
+            write(unit,'("        ", A)') 'color=lightgrey'
+            write(unit,'("        ", A)') 'node [style=filled,color=white]'
+            write(unit,'("        label = """, A, """")') string_strip(this%model%packages(i)%name)
+            do j = 1, size(this%model%packages(i)%sources)
+                do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                    is_added = .false.
+                    do l = 1, size(this%model%packages(i)%sources(j)%modules_used)
+                        if (.not. string_contains(excludes_mods, this%model%packages(i)%sources(j)%modules_used(l)) .and. &
+                                  string_contains(smods(i)%modules, this%model%packages(i)%sources(j)%modules_used(l))) then
+                            write(unit,'("        ", A, " -> ", A, A)') this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s, '[style="dashed"]'
+                            is_added = .true.
+                        end if
+                    end do
+                    if (.not. is_added) then
+                        write(unit,'("        ", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s
+                    end if
+                    exit !set all the use to belong to the first module in the file
+                end do
+            end do
+            write(unit,'(A)') '    }'
+        end do
+
+        do i = 1, size(this%model%packages)
+            if (present(exclude)) then; if (string_contains(exclude, this%model%packages(i)%name)) cycle; end if
+            do j = 1, size(this%model%packages(i)%sources)
+                do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                    do l = 1, size(this%model%packages(i)%sources(j)%modules_used)
+                        if (.not. string_contains(excludes_mods, this%model%packages(i)%sources(j)%modules_used(l)) .and. &
+                            .not. string_contains(smods(i)%modules, this%model%packages(i)%sources(j)%modules_used(l))) then
+                            write(unit,'("    ", A, "->", A)') this%model%packages(i)%sources(j)%modules_provided(k)%s, this%model%packages(i)%sources(j)%modules_used(l)%s
+                        end if
+                    end do
+                    exit !set all the use to belong to the first module in the file
+                end do
+            end do
+        end do
+        write(unit,'(A)') '}'
+        close(unit)
+
+        call execute_command_line(engine//' -Tsvg_inline '//this%name//'.dot > '//this%name//'.svg', wait=.true., exitstat=iostat, cmdmsg=iomsg)
+        if (iostat /= 0) print*, iomsg
+
+        open(newunit=unit, file=filepath, action='write', status='replace')
+        write(unit,'(*(A,/))')              &
+        '<!DOCTYPE html>'               ,   &
+        '<html lang="en">'              ,   &
+        '<head>'                        ,   &
+        '   <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.2/dist/svg-pan-zoom.min.js"></script>', &
+        '   <meta charset="utf-8">'     ,   &
+        '</head>'                       ,   &
+        '<body>'                        ,   &
+        '    <div class="diagram-container" id="diagram-container">'
+        !copy content of the svg
+        inquire(file=this%name//'.svg', exist=exists)
+        if (exists) then
+            open(newunit=sunit, file=this%name//'.svg', status='old', access='stream')
+            inquire(unit=sunit, size=n)
+            do i = 1, n
+                read(sunit, iostat=iostat, pos=i) svg
+                if (iostat /= 0) exit
+                write(unit, '(A)', advance='no') svg
+            end do
+            close(sunit)
+        end if
+        write(unit,'(*(A,/))')              &
+        '   </div>'                     ,   &
+        '<script>', &
+        'const container = document.getElementById("diagram-container");', &
+        'const svgElement = container.querySelector("svg");', &
+        'window.onload = function() {', &
+        '    svgPanZoom(svgElement, {', &
+        '        controlIconsEnabled: true,', &
+        '        fit: true,', &
+        '        center: true,', &
+        '        fit: false,', &
+        '        zoomEnabled: true,', &
+        '        panEnabled: true,', &
+        '        dblClickZoomEnabled: true,', &
+        '        preventEventsDefaults: true,', &
+        '        minZoom: 0.1,', &
+        '        maxZoom: 6,', &
+        '         zoomScaleSensitivity: 0.3', &
+        '    });', &
+        '};', &
+        '</script>'                        ,   &
+        '</body>'                       ,   &
+        '</html>'
+
+        close(unit)
+    end subroutine
+
+    subroutine package_export_to_circle(this, file, exclude)
+        class(package), intent(inout)       :: this
+        character(*), optional, intent(in)  :: file
+        type(string_t), optional, intent(in):: exclude(:)
+        !private
+        type(error_t), allocatable :: error
+        character(:), allocatable :: filepath
+        integer :: i, j, k, l, s, unit
+
+        if (present(file)) then
+            filepath = file
+        else
+            filepath = this%name//'.html'
+        end if
+
+        open(newunit=unit, file=filepath, action='readwrite', status='replace', access='stream', form='formatted')
+        write(unit,'(*(A,/))')              &
+        '<!DOCTYPE html>'               ,   &
+        '<html lang="en">'              ,   &
+        '<head>'                        ,   &
+        '   <style> body { margin: 0; } </style>'     ,   &
+        '   <script src="https://cdn.jsdelivr.net/npm/circlepack-chart"></script>'     ,   &
+        '</head>'                       ,   &
+        '<body>'                        ,   &
+        '   <div id="graph"></div>'      ,   &
+        '       <script type="module">', &
+        '       import { scaleOrdinal } from "https://esm.sh/d3-scale";', &
+        '       import { schemePaired } from "https://esm.sh/d3-scale-chromatic";'
+        write(unit,'(A)', advance='no') "       var datastr = '{"
+        write(unit,'("""name"": """, A, """,")', advance='no') this%name
+        write(unit,'(A)', advance='no') '"children": ['
+        do i = 1, size(this%model%packages)
+            if (present(exclude)) then
+                if (.not. string_contains(exclude, this%model%packages(i)%name)) then
+                    write(unit,'("{""name"": """, A ,""", ""children"": [")', advance='no') this%model%packages(i)%name
+                    do j = 1, size(this%model%packages(i)%sources)
+                        inquire(file=this%model%packages(i)%sources(j)%file_name, size=s)
+                        do k = 1, size(this%model%packages(i)%sources(j)%modules_provided)
+                            write(unit,'("{""name"": """, A ,""", ""value"": """, i0 ,"""},")', advance='no') &
+                                this%model%packages(i)%sources(j)%modules_provided(k)%s, s
+                        end do
+                    end do
+                    inquire(unit=unit, pos=s); read(unit,'(A)', advance='no', pos=s-1)
+                    write(unit,'(A)', advance='no') ']},'
+                end if
+            end if
+            
+        end do
+        inquire(unit=unit, pos=s); read(unit,'(A)', advance='no', pos=s-1)
+        write(unit,'(A)', advance='no') ']'
+        write(unit,'(A)') "}';"
+        write(unit,'(*(A,/))') &
+        '       var data = JSON.parse(datastr);', &
+        '       const color = scaleOrdinal(schemePaired);', &
+        '       const Graph = new CirclePack(document.getElementById("graph"))', &
+        '       .data(data)', &
+        '       .color(d => color(d.name))', &
+        '       .minCircleRadius(8);', &
+        '       </script>', &
+        '   </body>', &
+        '</html>'
+        close(unit)
+    end subroutine
+
+    subroutine handle_error(err)
+        type(error_t), optional, intent(in) :: err
+        if (present(err)) then
+            write (*, '("[Error]", 1x, a)') err%message
             stop 1
         end if
     end subroutine
+
+    function string_strip(instr) result(res)
+        character(*), intent(in) :: instr
+        character(:), allocatable :: res
+        !private
+        integer :: i
+
+        res = instr
+        do i = 1, len(res)
+            if (res(i:i) == '-') res(i:i) = '_'
+        end do
+    end function
 
     logical function string_contains_string(lhs, rhs) result(res)
         type(string_t), intent(in) :: lhs(:)

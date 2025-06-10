@@ -65,6 +65,16 @@ console(process_combined_stdout_stderr)
             call p%export_to_mermaid(exclude=exclude)
         case('force')
             call p%export_to_forcegraph(exclude=exclude)
+        case('dot')
+            call p%export_to_dot('dot', exclude=exclude)
+        case('fpd')
+            call p%export_to_dot('fdp', exclude=exclude)
+        case('neato')
+            call p%export_to_dot('neato', exclude=exclude)
+        case('sfpd')
+            call p%export_to_dot('sfdp', exclude=exclude)
+        case('circle')
+            call p%export_to_circle(exclude=exclude)
         case default
             print *, 'Unknown chart option. Supported values are "mermaid" and "force"'
         end select
