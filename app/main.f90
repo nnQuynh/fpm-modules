@@ -56,10 +56,11 @@ console(main)
                 if (i <= nargs) chart = args(i)
             case ('-v','--version')
                 i = i + 1
-                write(*, '(*(A,/))') 'fpm-modules version'//version,     &
+                write(*, '(*(A,/))') 'fpm-modules version '//version,     &
                                      'Copyright (C) 2025 davidpfister', &
                                      'This is free software; see the source for copying conditions.  There is NO', &
                                      'warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.'
+                stop
             case ('-h','--help', '?')
                 i = i + 1
                 write(*, '(*(A,/))') '                             fom-modules plugin help', &
@@ -78,6 +79,7 @@ console(main)
                                      '-o, --output      Output file path with name and extension.', &
                                      '-v, --version     Display the version of the program.', &
                                      '-x, --exclude     Comma separated list of excluded packages.'
+                stop
             case default
                 if (i == 1) dir = args(i)
             end select
