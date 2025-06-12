@@ -78,7 +78,7 @@ module modules_layout_force
                         if (string_contains(modules, model%packages(i)%sources(j)%modules_used(l)) .and. &
                             .not. string_contains(excludes_mods, model%packages(i)%sources(j)%modules_used(l))) then
                             write(unit,'("{""source"": """, A ,""", ""target"": """, A ,""", ""value"":", i0,"},")', advance='no') &
-                                model%packages(i)%sources(j)%modules_used(l)%s, model%packages(i)%sources(j)%modules_provided(k)%s, merge(5, 1, i == 1)
+                                model%packages(i)%sources(j)%modules_provided(k)%s, model%packages(i)%sources(j)%modules_used(l)%s, merge(5, 1, i == 1)
                         end if
                     end do
                     exit !set all the use to belong to the first module in the file

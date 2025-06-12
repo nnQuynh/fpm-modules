@@ -115,7 +115,7 @@ module modules_layout_graphviz
                     do l = 1, size(model%packages(i)%sources(j)%modules_used)
                         if (.not. string_contains(excludes_mods, model%packages(i)%sources(j)%modules_used(l)) .and. &
                                   string_contains(smods(i)%modules, model%packages(i)%sources(j)%modules_used(l))) then
-                            write(unit,'("        ", A, " -> ", A, A)') model%packages(i)%sources(j)%modules_used(l)%s, model%packages(i)%sources(j)%modules_provided(k)%s, '[style="dashed"]'
+                            write(unit,'("        ", A, " -> ", A, A)') model%packages(i)%sources(j)%modules_provided(k)%s, model%packages(i)%sources(j)%modules_used(l)%s, '[style="dashed"]'
                             is_added = .true.
                         end if
                     end do
@@ -135,7 +135,7 @@ module modules_layout_graphviz
                     do l = 1, size(model%packages(i)%sources(j)%modules_used)
                         if (.not. string_contains(excludes_mods, model%packages(i)%sources(j)%modules_used(l)) .and. &
                             .not. string_contains(smods(i)%modules, model%packages(i)%sources(j)%modules_used(l))) then
-                            write(unit,'("    ", A, "->", A)') model%packages(i)%sources(j)%modules_used(l)%s, model%packages(i)%sources(j)%modules_provided(k)%s
+                            write(unit,'("    ", A, "->", A)') model%packages(i)%sources(j)%modules_provided(k)%s, model%packages(i)%sources(j)%modules_used(l)%s
                         end if
                     end do
                     exit !set all the use to belong to the first module in the file

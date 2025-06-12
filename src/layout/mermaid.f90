@@ -69,7 +69,7 @@ module modules_layout_mermaid
                 do k = 1, size(model%packages(i)%sources(j)%modules_provided)
                     do l = 1, size(model%packages(i)%sources(j)%modules_used)
                         if (.not. string_contains(excludes_mods, model%packages(i)%sources(j)%modules_used(l))) then
-                            write(unit,'("    ", A, "-->", A)') model%packages(i)%sources(j)%modules_used(l)%s, model%packages(i)%sources(j)%modules_provided(k)%s
+                            write(unit,'("    ", A, "-->", A)') model%packages(i)%sources(j)%modules_provided(k)%s, model%packages(i)%sources(j)%modules_used(l)%s
                         end if
                     end do
                     exit !set all the use to belong to the first module in the file
