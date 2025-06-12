@@ -23,7 +23,7 @@ source-form = "free"
 
 [preprocess]
 cpp.suffixes = ["F90", "f90"]
-cpp.macros = ["_FPM"]
+cpp.macros = ["_FPM","_VERSION=\"'{version}'\""]
 
 [dependencies]
 fpm = {git = "https://github.com/fortran-lang/fpm"}

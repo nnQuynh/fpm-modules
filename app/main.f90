@@ -1,3 +1,10 @@
+# ifdef __GFORTRAN__
+#    define MACRO_SAME(A) A
+#    define MACRO_STRINGIFY(A) "A"
+# else
+#    define MACRO_SAME(A) A
+#    define MACRO_STRINGIFY(A) #A
+# endif
 #include <app.inc> 
 console(main)
     main(args)
@@ -17,7 +24,11 @@ console(main)
         character(:), allocatable :: output, filepath
         type(string_t), allocatable :: exclude(:)
         type(package) :: p
-        character(*), parameter :: version = "1.0.0"
+#if defined(_VERSION)
+       character(*), parameter :: version = _VERSION
+#else
+       character(*), parameter :: version = '0.0.0'
+#endif
 
         nargs = size(args)
         i = 1
