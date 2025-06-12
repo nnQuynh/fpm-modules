@@ -61,11 +61,11 @@ To build that library you need
 **fpm-modules** has few command lines that can be used: 
 
 >- -d, --dir: The path to the directory where the fpm.toml file seats. </br>
-> ```fpm-modules -d "./"```
+> ```fpm modules -d "./"```
 >- -c, --chart: The charting library. Possible options are "mermaid" and "force" (default).</br>
-> ```fpm-modules -c "mermaid"``` 
+> ```fpm modules -c "mermaid"``` 
 >- -x, -exclude: The list of excluded packages by name.  Names are comma-separated, no spaces, no quotes.</br>
-> ```fpm-modules -x fpm,daglib```
+> ```fpm modules -x fpm,daglib```
 
 ### Installation
 

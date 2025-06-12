@@ -90,10 +90,10 @@ First, ensure [fpm is installed](https://fpm.fortran-lang.org/en/install/index.h
    The `[dependencies]` section pulls in fpm’s source code, giving us access to its API.
 
 3. **Set Up the Main Module**:
-   In the `src` folder, create `package.f90` with the necessary fpm modules:
+   In the `src` folder, create `packages.f90` with the necessary fpm modules:
 
    ```fortran
-   module fpm_package
+   module modules_packages
        use fpm_strings, only: string_t
        use fpm_command_line, only: fpm_build_settings, get_command_line_settings, get_fpm_env
        use fpm_dependency, only: dependency_tree_t, new_dependency_tree
@@ -105,30 +105,30 @@ First, ensure [fpm is installed](https://fpm.fortran-lang.org/en/install/index.h
        private
 
        type, extends(package_config_t), public :: package
+           type(fpm_model_t), public           :: model
        contains
            procedure, public :: create => package_create
        end type
    end module
    ```
 
-These modules provide access to fpm’s build model, file system utilities, and error handling. The key components are `package_config_t` (for project configuration) and `build_model` (for generating the dependency tree).
+These modules provide access to fpm’s build model, file system utilities, and error handling. The key components are `fpm_model_t` (for project configuration) and `build_model` (for generating the dependency tree).
 
 ## Exploring fpm’s Build Model
 
 fpm’s build model is a structured representation of your project’s modules, source files, and dependencies. Our plugin will use this model to identify module dependencies and create a chart.
 
-The key component is the `package_config_t` type, which contains a nested model object. Here’s a simplified view:
+The key component is the `fpm_model_t` type, which contains a nested model object. Here’s a simplified view:
 
 
 ```
--    package_config_t
-                    |- model
-                           |- external_modules(:)
-                           |- packages(:)
-                                       |- name
-                                       |- sources(:)
-                                                  |- modules_provided(:)
-                                                  |- module_used(:)
+-    fpm_model_t
+                |- external_modules(:)
+                |- packages(:)
+                                |- name
+                                |- sources(:)
+                                            |- modules_provided(:)
+                                            |- module_used(:)
 ``` 
 
 - **external_modules**: External modules (e.g., `ifcore` from Intel or `openmp`) linked to the project but not in the source code.

@@ -6,7 +6,7 @@
         "type": "cppdbg",
         "request": "launch",
         "program": "${workspaceFolder}/build/gfortran_23F08250062B633E/app/fpm-modules.exe",
-        "args": ["C:\\Users\\dev\\Documents\\GitHub\\sandbox\\fpm-modules"],
+        "args": ["C:\\Users\\dev\\Documents\\GitHub\\sandbox\\fpm-modules -c dot"],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}",
         "environment": [],
