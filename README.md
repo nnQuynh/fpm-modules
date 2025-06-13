@@ -37,7 +37,7 @@ The present project has been created for doing just that. It has been designed t
 * [![ifort][ifort]][ifort-url]
 * [![gfortran][gfortran]][gfortran-url]
 
-Check out the [tutorial](./dox/tutorial.md) to know more about it!
+Check out the [tutorial](./.dox/tutorial.md) to know more about it!
 
 <!-- GETTING STARTED -->
 ## Getting Started
