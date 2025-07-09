@@ -1,6 +1,6 @@
 #include <assertion.inc>
 TESTPROGRAM(main)
-    TEST(test_json)
+    TEST('test_json')
         use modules_packages
 
         type(package) :: p
@@ -19,7 +19,7 @@ TESTPROGRAM(main)
         close(unit, status='delete')
     END_TEST
 
-    TEST(test_circle)
+    TEST('test_circle')
         use modules_packages
         
         type(package) :: p
@@ -38,7 +38,7 @@ TESTPROGRAM(main)
         close(unit, status='delete')
     END_TEST
 
-    TEST(test_force)
+    TEST('test_force')
         use modules_packages
         
         type(package) :: p
@@ -57,7 +57,7 @@ TESTPROGRAM(main)
         close(unit, status='delete')
     END_TEST
 
-    TEST(test_force)
+    TEST('test_force')
         use modules_packages
         
         type(package) :: p
