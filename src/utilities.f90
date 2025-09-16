@@ -80,6 +80,10 @@ module modules_utilities
         type(error_t), optional, intent(in) :: err
         if (present(err)) then
             write (*, '("[Error]", 1x, a)') err%message
+            if (err == 0) then 
+                write(*,*)
+
+
             stop 1
         end if
     end subroutine
