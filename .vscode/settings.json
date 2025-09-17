@@ -1,5 +1,9 @@
 {
-    "search.exclude": {
-        "**/*.code-workspace": true
-    }
+    "fortran.linter.includePaths": [
+            "${workspaceFolder}/include/**",
+            "${workspaceFolder}/build/**"
+        ],
+
+    "fortran.linter.modOutput": "${workspaceFolder}/.fmod",
+    "editor.tabSize": 2
 }
