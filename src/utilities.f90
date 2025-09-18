@@ -23,10 +23,7 @@ module modules_utilities
     end interface
 
     contains
-    double precision function x_lisoe(Z0,A0,BETA0)
-      implicit real*8 (a-h,o-z)
 
-        end function
     subroutine chdir(path, ierr)
         character(*), intent(in)        :: path
         integer, optional, intent(out)  :: ierr
@@ -79,23 +76,11 @@ module modules_utilities
         end do
     end function
 
-          pure elemental subroutine handle_error(err)
+    subroutine handle_error(err)
         type(error_t), optional, intent(in) :: err
         if (present(err)) then
-            write (*, '("[Error]", 1x, a)') err%messag
-
-
+            write (*, '("[Error]", 1x, a)') err%message
             stop 1
         end if
     end subroutine
-end module
-
-
-module test
-    use, intrinsic :: iso_c_binding
-    use fpm_strings, only: string_t
-    use fpm_error, only : error_t
-
-    implicit none; private
-
 end module
